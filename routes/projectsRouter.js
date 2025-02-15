@@ -2,23 +2,22 @@ const express = require("express");
 const router = express.Router();
 const Project = require("../models/Project");
 const authMiddleware = require("../middleware/authMiddleware");
+const { predictProjectDuration } = require("../ai/openaiEstimator");
 
-// Tambah Proyek (Hanya User yang Login)
+// Tambah Proyek & Estimasi Durasi dengan OpenAI
 router.post("/add", authMiddleware, async (req, res) => {
   try {
-    const project = new Project(req.body);
-    await project.save();
-    res.status(201).json(project);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
+    const { name, description, startDate, status } = req.body;
 
-// Ambil Semua Proyek (Hanya User yang Login)
-router.get("/", authMiddleware, async (req, res) => {
-  try {
-    const projects = await Project.find();
-    res.json(projects);
+    // Prediksi durasi proyek dengan OpenAI
+    const estimatedDays = await predictProjectDuration(description);
+    const estimatedCompletion = new Date(startDate);
+    estimatedCompletion.setDate(estimatedCompletion.getDate() + estimatedDays);
+
+    // Simpan proyek ke database
+    const project = new Project({ name, description, startDate, status, estimatedCompletion });
+
+    res.status(201).json({ project, estimatedDays });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
